@@ -176,4 +176,4 @@ I have checked on environment below.
 
 ## License
 
-[MIT](https://github.com/escapism/DoujinHelper/blob/main/LICENSE)
+[MIT](https://github.com/escapism/DoujinHelper/blob/master/LICENSE)
