@@ -1,0 +1,18 @@
+{
+	"presets": [
+		[
+			"@babel/preset-env",
+			{
+				"loose": true,
+				"modules": false
+			}
+		]
+	],
+	"comments": false,
+	"plugins": [
+    "@babel/transform-member-expression-literals",
+    "@babel/transform-property-literals",
+    "@babel/plugin-transform-property-mutators",
+    "@babel/plugin-transform-reserved-words"
+  ]
+}
