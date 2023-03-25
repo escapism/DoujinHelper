@@ -86,6 +86,12 @@ class FontSelector {
 	getPostScriptName() {
 		return this.currentFont.postScriptName
 	}
+  getFamily() {
+    return this.currentFont.family
+  }
+  getStyle() {
+    return this.currentFont.style
+  }
 	static fontSet = []
 	static items = (() => {
 		const items = []

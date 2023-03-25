@@ -42,6 +42,10 @@ class FolioCoords {
 		this.rb2.onClick = function() {
 			_this.change(this)
 		}
+
+    if (this.mode === FolioCoords.CENTER) {
+      this.edit.enabled = false
+    }
 	}
 	change(btn) {
 		this.mode = FolioCoords.modeList[btn.text]

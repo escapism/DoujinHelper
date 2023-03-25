@@ -71,6 +71,12 @@ class ColorPickerButton {
 	getColor() {
 		return this.color
 	}
+  getRGB() {
+    return [this.color.rgb.red, this.color.rgb.green, this.color.rgb.blue]
+  }
+  getCMYK() {
+    return [this.color.cmyk.cyan, this.color.cmyk.magenta, this.color.cmyk.yellow, this.color.cmyk.black]
+  }
 }
 
 export default ColorPickerButton
