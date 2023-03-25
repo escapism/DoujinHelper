@@ -1,282 +1,315 @@
 import { loadconfig, convertInt, convertFloat, selectionByTransparent, pxArrayUnique } from './modules/utils'
 import FontSelector from "./modules/fontSelector"
 import ActionButtons from "./modules/actionButtons"
+import json2 from './modules/json2'
 
 /** デフォルト設定 */
 const DEFAULT = loadconfig(NAME, {
-	fontsize: 6,
-	fontfamily: 'Verdana',
-	initNum: 3,
-	bleed: 3,
-	flatten: false,
-	bind: 'right',
-	autoSave: false,
-	enableAlert: true,
+  fontsize: 6,
+  fontfamily: 'Verdana',
+  initNum: 3,
+  bleed: 3,
+  flatten: false,
+  bind: 'right',
+  autoSave: false,
+  enableAlert: true,
+  keepParameter: true,
 });
 
 (function () {
-	const docNum = documents.length
-	if (!docNum) return
+  const docNum = documents.length
+  if (!docNum) return
 
-	// 入力窓
-	const dialog = new Window('dialog', '隠しノンブル')
+  const settings = (() => {
+    if (DEFAULT.keepParameter) {
+      const env = $.getenv('doujinhelper/blindFolio')
+      return env ? JSON.parse(env) : DEFAULT
+    }
+    return DEFAULT
+  })()
 
-	const innerWidth = 280, labelWidth = 48
+  if ('skipPage' in settings === false) {
+    settings.skipPage = ''
+  }
 
-	const fs = new FontSelector(dialog, { width: innerWidth }, DEFAULT.fontfamily)
-	const inputNum = dialog.add("Group{\
+  // 入力窓
+  const dialog = new Window('dialog', '隠しノンブル')
+
+  const innerWidth = 280, labelWidth = 48
+
+  const fs = new FontSelector(dialog, { width: innerWidth }, settings.fontfamily, settings.fontstyle)
+  const inputNum = dialog.add("Group{\
 		label:StaticText{text:'初期値',justify:'right'},\
-		edit:EditText{text:'" + DEFAULT.initNum + "'}\
+		edit:EditText{text:'" + settings.initNum + "'}\
 	}")
-	inputNum.preferredSize.width = innerWidth
-	inputNum.label.preferredSize.width = labelWidth
-	inputNum.edit.preferredSize.width = innerWidth - labelWidth - inputNum.spacing
+  inputNum.preferredSize.width = innerWidth
+  inputNum.label.preferredSize.width = labelWidth
+  inputNum.edit.preferredSize.width = innerWidth - labelWidth - inputNum.spacing
 
-	const inputBleed = dialog.add("Group{\
+  const inputBleed = dialog.add("Group{\
 		label:StaticText{text:'断ち切り',justify:'right'},\
-		edit:EditText{text:'" + DEFAULT.bleed + "'}\
+		edit:EditText{text:'" + settings.bleed + "'}\
 		unit:StaticText{text:'mm',justify:'left'}\
 	}")
-	inputBleed.preferredSize.width = innerWidth
-	inputBleed.label.preferredSize.width = labelWidth
-	inputBleed.edit.preferredSize.width = 180
+  inputBleed.preferredSize.width = innerWidth
+  inputBleed.label.preferredSize.width = labelWidth
+  inputBleed.edit.preferredSize.width = 180
 
-	const inputSkipPage = dialog.add("Group{\
+  const inputSkipPage = dialog.add("Group{\
 		label:StaticText{text:'除外ページ',justify:'right'},\
-		edit:EditText{text:''}\
+		edit:EditText{text:'" + settings.skipPage + "'}\
 	}")
-	inputSkipPage.preferredSize.width = innerWidth
-	inputSkipPage.label.preferredSize.width = 60
-	inputSkipPage.edit.preferredSize.width = innerWidth - inputSkipPage.label.preferredSize.width - inputSkipPage.spacing * 2
+  inputSkipPage.preferredSize.width = innerWidth
+  inputSkipPage.label.preferredSize.width = 60
+  inputSkipPage.edit.preferredSize.width = innerWidth - inputSkipPage.label.preferredSize.width - inputSkipPage.spacing * 2
 
-	const flugGroup = dialog.add("Group{\
+  const flugGroup = dialog.add("Group{\
 		binarization:Checkbox{text:'2値化'},\
 		flatten:Checkbox{text:'統合'},\
 		bindR:RadioButton{text:'右綴じ'},\
 		bindL:RadioButton{text:'左綴じ'}\
 	}")
-	if (DEFAULT.bind.toLowerCase() === 'left') {
-		flugGroup.bindL.value = true
-	} else {
-		flugGroup.bindR.value = true
-	}
+  if (settings.bind.toLowerCase() === 'left') {
+    flugGroup.bindL.value = true
+  } else {
+    flugGroup.bindR.value = true
+  }
 
-	flugGroup.binarization.onClick = function (e) {
-		if (flugGroup.binarization.value) {
-			flugGroup.flatten.value = true
-		}
-	}
-	flugGroup.flatten.onClick = function (e) {
-		if (!flugGroup.flatten.value) {
-			flugGroup.binarization.value = false
-		}
-	}
+  flugGroup.binarization.onClick = function (e) {
+    if (flugGroup.binarization.value) {
+      flugGroup.flatten.value = true
+    }
+  }
+  flugGroup.flatten.onClick = function (e) {
+    if (!flugGroup.flatten.value) {
+      flugGroup.binarization.value = false
+    }
+  }
 
-	if (activeDocument.mode === DocumentMode.BITMAP) {
-		// 2値のときtrue
-		flugGroup.binarization.value =
-			flugGroup.flatten.value = true
-	} else {
-		flugGroup.flatten.value = DEFAULT.flatten
-	}
 
-	const inputSave = dialog.add('checkbox', undefined, '保存して閉じる')
-	inputSave.value = DEFAULT.autoSave
+  flugGroup.flatten.value = settings.flatten
 
-	new ActionButtons(dialog)
+  if ('binarization' in settings) {
+    flugGroup.binarization.value = settings.binarization
+  } else if (activeDocument.mode === DocumentMode.BITMAP) {
+    // 2値のときtrue
+    flugGroup.binarization.value =
+      flugGroup.flatten.value = true
+  }
 
-	const ret = dialog.show()
+  const inputSave = dialog.add('checkbox', undefined, '保存して閉じる')
+  inputSave.value = settings.autoSave
 
-	// キャンセル
-	if (ret != 1) {
-		return
-	}
+  new ActionButtons(dialog)
 
-	const autoSave = inputSave.value
+  const ret = dialog.show()
 
-	// ディレクトリ選択
-	let fObj;
-	if (autoSave) {
-		fObj = Folder.selectDialog('保存するディレクトリを選択')
-		if (!fObj) return
+  // キャンセル
+  if (ret != 1) {
+    return
+  }
 
-		let alertFlag = false,
-			docPath
-		for (let i = 0; i < docNum; i++) {
-			try {
-				docPath = documents[i].path
-			} catch (e) {
-				docPath = false
-			}
-			if (docPath && docPath.fullName == fObj.fullName) {
-				alertFlag = true
-				break
-			}
-		}
+  const selectedFont = fs.getPostScriptName(),
+    fontsize = DEFAULT.fontsize,
+    color = new SolidColor()
 
-		if (alertFlag) {
-			const conf = Window.confirm('同一のディレクトリに保存されているファイルがあります。このまま実行してよろしいですか？', false, '警告')
-			if (!conf) return
-		}
-	}
+  if (activeDocument.mode === DocumentMode.RGB) {
+    color.rgb.red = 0
+    color.rgb.green = 0
+    color.rgb.blue = 0
+  } else {
+    color.cmyk.cyan = 0
+    color.cmyk.magenta = 0
+    color.cmyk.yellow = 0
+    color.cmyk.black = 100
+  }
 
-	const selectedFont = fs.getPostScriptName(),
-		fontsize = DEFAULT.fontsize,
-		color = new SolidColor()
+  const initNum = convertInt(inputNum.edit.text, 3),
+    bleed = convertFloat(inputBleed.edit.text, 0),
+    binarization = flugGroup.binarization.value,
+    flatten = flugGroup.flatten.value,
+    bindRight = flugGroup.bindR.value,
+    enableAlert = DEFAULT.enableAlert,
+    autoSave = inputSave.value
 
-	if (activeDocument.mode === DocumentMode.RGB) {
-		color.rgb.red = 0
-		color.rgb.green = 0
-		color.rgb.blue = 0
-	} else {
-		color.cmyk.cyan = 0
-		color.cmyk.magenta = 0
-		color.cmyk.yellow = 0
-		color.cmyk.black = 100
-	}
+  const skipPage = inputSkipPage.edit.text.split(/,\s*|\s+/)
 
-	const initNum = convertInt(inputNum.edit.text, 3),
-		bleed = convertFloat(inputBleed.edit.text, 0),
-		binarization = flugGroup.binarization.value,
-		flatten = flugGroup.flatten.value,
-		bindRight = flugGroup.bindR.value,
-		enableAlert = DEFAULT.enableAlert
+  if (skipPage.length) {
+    skipPage.unique()
+  }
 
-	const skipPage = inputSkipPage.edit.text.split(/,\s*|\s+/)
+  // 設定値を環境変数にJSONで保存
+  if (DEFAULT.keepParameter) {
+    $.setenv('doujinhelper/blindFolio', JSON.stringify({
+      fontfamily: fs.getFamily(),
+      fontstyle: fs.getStyle(),
+      initNum,
+      bleed,
+      binarization,
+      flatten,
+      bind: bindRight ? 'right' : 'left',
+      autoSave,
+      skipPage: skipPage.join(',')
+    }))
+  }
 
-	if (skipPage.length) {
-		skipPage.unique().reverse()
-	}
+  skipPage.reverse()
 
-	const gutterDistance = bleed + .3
+  // ディレクトリ選択
+  let fObj;
+  if (autoSave) {
+    fObj = Folder.selectDialog('保存するディレクトリを選択')
+    if (!fObj) return
 
-	const unitCache = {
-		ruler: preferences.rulerUnits,
-		type: preferences.typeUnits
-	}
+    let alertFlag = false,
+      docPath
+    for (let i = 0; i < docNum; i++) {
+      try {
+        docPath = documents[i].path
+      } catch (e) {
+        docPath = false
+      }
+      if (docPath && docPath.fullName == fObj.fullName) {
+        alertFlag = true
+        break
+      }
+    }
 
-	// 単位を mm, pt に変更
-	preferences.rulerUnits = Units.MM
-	preferences.typeUnits = TypeUnits.POINTS
+    if (alertFlag) {
+      const conf = Window.confirm('同一のディレクトリに保存されているファイルがあります。このまま実行してよろしいですか？', false, '警告')
+      if (!conf) return
+    }
+  }
 
-	let pageNum = initNum; // 現在のページ番号
+  const gutterDistance = bleed + .3
 
-	for (let i = 0; i < docNum; i++) {
-		activeDocument = documents[autoSave ? 0 : i]
+  const unitCache = {
+    ruler: preferences.rulerUnits,
+    type: preferences.typeUnits
+  }
 
-		if (activeDocument.mode === DocumentMode.BITMAP) {
-			activeDocument.changeMode(ChangeMode.GRAYSCALE)
-		}
+  // 単位を mm, pt に変更
+  preferences.rulerUnits = Units.MM
+  preferences.typeUnits = TypeUnits.POINTS
 
-		const doc = activeDocument
+  let pageNum = initNum; // 現在のページ番号
 
-		const docWidth = parseFloat(doc.width),
-			docHeight = parseFloat(doc.height)
+  for (let i = 0; i < docNum; i++) {
+    activeDocument = documents[autoSave ? 0 : i]
 
-		if (skipPage.length) {
-			for (let j = skipPage.length + 1; j >= 0; j--) {
-				if (skipPage[j] == pageNum) {
-					skipPage.splice(j, 1)
-					pageNum++
-				} else if (skipPage[j] < pageNum) {
-					skipPage.splice(j, 1)
-				} else {
-					break
-				}
-			}
-		}
+    if (activeDocument.mode === DocumentMode.BITMAP) {
+      activeDocument.changeMode(ChangeMode.GRAYSCALE)
+    }
 
-		const layer = doc.artLayers.add()
-		layer.kind = LayerKind.TEXT
-		layer.textItem.contents = '0'
-		layer.textItem.size = fontsize + 'pt'
-		layer.textItem.font = selectedFont
-		layer.textItem.color = color
-		layer.textItem.useAutoLeading = false
-		layer.textItem.leading = fontsize + 'pt'
-		layer.textItem.justification = Justification.CENTER
+    const doc = activeDocument
 
-		if (binarization ||
-			activeDocument.mode === DocumentMode.GRAYSCALE ||
-			activeDocument.mode === DocumentMode.BITMAP) {
-			layer.textItem.antiAliasMethod = AntiAlias.NONE
-		} else {
-			layer.textItem.antiAliasMethod = AntiAlias.SHARP
-		}
+    const docWidth = parseFloat(doc.width),
+      docHeight = parseFloat(doc.height)
 
-		let text = pageNum.toString(10)
-		if (text.length > 1) {
-			let _text = text[0]
-			for (let j = 1, m = text.length; j < m; j++) {
-				_text += '\r' + text[j]
-			}
-			text = _text
-		}
+    if (skipPage.length) {
+      for (let j = skipPage.length + 1; j >= 0; j--) {
+        if (skipPage[j] == pageNum) {
+          skipPage.splice(j, 1)
+          pageNum++
+        } else if (skipPage[j] < pageNum) {
+          skipPage.splice(j, 1)
+        } else {
+          break
+        }
+      }
+    }
 
-		layer.textItem.contents = text
+    const layer = doc.artLayers.add()
+    layer.kind = LayerKind.TEXT
+    layer.textItem.contents = '0'
+    layer.textItem.size = fontsize + 'pt'
+    layer.textItem.font = selectedFont
+    layer.textItem.color = color
+    layer.textItem.useAutoLeading = false
+    layer.textItem.leading = fontsize + 'pt'
+    layer.textItem.justification = Justification.CENTER
 
-		const lb = layer.bounds
+    if (binarization ||
+      activeDocument.mode === DocumentMode.GRAYSCALE ||
+      activeDocument.mode === DocumentMode.BITMAP) {
+      layer.textItem.antiAliasMethod = AntiAlias.NONE
+    } else {
+      layer.textItem.antiAliasMethod = AntiAlias.SHARP
+    }
 
-		let x, y = docHeight - 8 - parseFloat(lb[3])
-		const odd = pageNum % 2
+    let text = pageNum.toString(10)
+    if (text.length > 1) {
+      let _text = text[0]
+      for (let j = 1, m = text.length; j < m; j++) {
+        _text += '\r' + text[j]
+      }
+      text = _text
+    }
 
-		if (bindRight == odd) {
-			// 右綴じ奇数ページ or 左綴じ偶数ページ
-			x = docWidth - gutterDistance - parseFloat(lb[2])
-		} else {
-			// 右綴じ偶数ページ or 左綴じ奇数ページ
-			x = gutterDistance - parseFloat(lb[0])
-		}
-		layer.translate(x, y)
+    layer.textItem.contents = text
 
-		activeDocument.activeLayer = layer
+    const lb = layer.bounds
 
-		// 白く縁取り
-		const uv = UnitValue(0.3, 'mm')
-		uv.baseUnit = UnitValue(1 / activeDocument.resolution, 'in')
+    let x, y = docHeight - 8 - parseFloat(lb[3])
+    const odd = pageNum % 2
 
-		selectionByTransparent()
-		activeDocument.selection.expand(uv.as('px'))
+    if (bindRight == odd) {
+      // 右綴じ奇数ページ or 左綴じ偶数ページ
+      x = docWidth - gutterDistance - parseFloat(lb[2])
+    } else {
+      // 右綴じ偶数ページ or 左綴じ奇数ページ
+      x = gutterDistance - parseFloat(lb[0])
+    }
+    layer.translate(x, y)
 
-		const backLayer = activeDocument.artLayers.add()
-		backLayer.move(layer, ElementPlacement.PLACEAFTER)
+    activeDocument.activeLayer = layer
 
-		const white = new SolidColor()
-		white.rgb.red = 255
-		white.rgb, green = 255
-		white.rgb, blue = 255
+    // 白く縁取り
+    const uv = UnitValue(0.3, 'mm')
+    uv.baseUnit = UnitValue(1 / activeDocument.resolution, 'in')
 
-		activeDocument.selection.fill(white)
-		activeDocument.selection.deselect()
+    selectionByTransparent()
+    activeDocument.selection.expand(uv.as('px'))
 
-		// 2値化
-		if (binarization) {
-			if (activeDocument.mode !== DocumentMode.GRAYSCALE) {
-				activeDocument.changeMode(ChangeMode.GRAYSCALE)
-			}
+    const backLayer = activeDocument.artLayers.add()
+    backLayer.move(layer, ElementPlacement.PLACEAFTER)
 
-			const opt = new BitmapConversionOptions()
-			opt.method = BitmapConversionType.HALFTHRESHOLD
-			opt.resolution = activeDocument.resolution
-			activeDocument.changeMode(ChangeMode.BITMAP, opt)
-		}
-		// レイヤーを統合
-		else if (flatten) {
-			activeDocument.flatten()
-		}
+    const white = new SolidColor()
+    white.rgb.red = 255
+    white.rgb, green = 255
+    white.rgb, blue = 255
 
-		// 別名で保存して閉じる
-		if (autoSave) {
-			const fileobj = new File(`${fObj.fullName}/${activeDocument.name}`)
-			activeDocument.saveAs(fileobj)
-			activeDocument.close(SaveOptions.SAVECHANGES)
-		}
-		pageNum++
-	}
+    activeDocument.selection.fill(white)
+    activeDocument.selection.deselect()
 
-	// 単位を元の設定に戻す
-	preferences.rulerUnits = unitCache.ruler
-	preferences.typeUnits = unitCache.type
+    // 2値化
+    if (binarization) {
+      if (activeDocument.mode !== DocumentMode.GRAYSCALE) {
+        activeDocument.changeMode(ChangeMode.GRAYSCALE)
+      }
 
-	if (enableAlert) alert('すべての処理が完了しました。')
+      const opt = new BitmapConversionOptions()
+      opt.method = BitmapConversionType.HALFTHRESHOLD
+      opt.resolution = activeDocument.resolution
+      activeDocument.changeMode(ChangeMode.BITMAP, opt)
+    }
+    // レイヤーを統合
+    else if (flatten) {
+      activeDocument.flatten()
+    }
+
+    // 別名で保存して閉じる
+    if (autoSave) {
+      const fileobj = new File(`${fObj.fullName}/${activeDocument.name}`)
+      activeDocument.saveAs(fileobj)
+      activeDocument.close(SaveOptions.SAVECHANGES)
+    }
+    pageNum++
+  }
+
+  // 単位を元の設定に戻す
+  preferences.rulerUnits = unitCache.ruler
+  preferences.typeUnits = unitCache.type
+
+  if (enableAlert) alert('すべての処理が完了しました。')
 })()

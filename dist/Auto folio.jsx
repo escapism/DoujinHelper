@@ -1,6 +1,6 @@
 /*
  * Auto folio
- * Version 1.0
+ * Version 1.1
  *
  * (c) 2022 uco
  *
@@ -229,6 +229,14 @@ var FontSelector = function () {
     return this.currentFont.postScriptName;
   };
 
+  _proto.getFamily = function getFamily() {
+    return this.currentFont.family;
+  };
+
+  _proto.getStyle = function getStyle() {
+    return this.currentFont.style;
+  };
+
   return FontSelector;
 }();
 
@@ -377,6 +385,14 @@ var ColorPickerButton = function () {
     return this.color;
   };
 
+  _proto.getRGB = function getRGB() {
+    return [this.color.rgb.red, this.color.rgb.green, this.color.rgb.blue];
+  };
+
+  _proto.getCMYK = function getCMYK() {
+    return [this.color.cmyk.cyan, this.color.cmyk.magenta, this.color.cmyk.yellow, this.color.cmyk.black];
+  };
+
   return ColorPickerButton;
 }();
 
@@ -435,6 +451,10 @@ var FolioCoords = function () {
     this.rb2.onClick = function () {
       _this.change(this);
     };
+
+    if (this.mode === FolioCoords.CENTER) {
+      this.edit.enabled = false;
+    }
   }
 
   var _proto = FolioCoords.prototype;
@@ -469,6 +489,209 @@ FolioCoords.modeList = {
   '中央': FolioCoords.CENTER
 };
 
+if (typeof JSON !== 'object') {
+  JSON = {};
+}
+
+((function () {
+
+  var rx_one = /^[\],:{}\s]*$/,
+      rx_two = /\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g,
+      rx_three = /"[^"\\\n\r]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g,
+      rx_four = /(?:^|:|,)(?:\s*\[)+/g,
+      rx_escapable = /[\\\"\u0000-\u001f\u007f-\u009f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
+      rx_dangerous = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g;
+
+  function f(n) {
+    return n < 10 ? '0' + n : n;
+  }
+
+  function this_value() {
+    return this.valueOf();
+  }
+
+  if (typeof Date.prototype.toJSON !== 'function') {
+    Date.prototype.toJSON = function () {
+      return isFinite(this.valueOf()) ? this.getUTCFullYear() + '-' + f(this.getUTCMonth() + 1) + '-' + f(this.getUTCDate()) + 'T' + f(this.getUTCHours()) + ':' + f(this.getUTCMinutes()) + ':' + f(this.getUTCSeconds()) + 'Z' : null;
+    };
+
+    Boolean.prototype.toJSON = this_value;
+    Number.prototype.toJSON = this_value;
+    String.prototype.toJSON = this_value;
+  }
+
+  var gap, indent, meta, rep;
+
+  function quote(string) {
+    rx_escapable.lastIndex = 0;
+    return rx_escapable.test(string) ? '"' + string.replace(rx_escapable, function (a) {
+      var c = meta[a];
+      return typeof c === 'string' ? c : "\\u" + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+    }) + '"' : '"' + string + '"';
+  }
+
+  function str(key, holder) {
+    var i,
+        k,
+        v,
+        length,
+        mind = gap,
+        partial,
+        value = holder[key];
+
+    if (value && typeof value === 'object' && typeof value.toJSON === 'function') {
+      value = value.toJSON(key);
+    }
+
+    if (typeof rep === 'function') {
+      value = rep.call(holder, key, value);
+    }
+
+    switch (typeof value) {
+      case 'string':
+        return quote(value);
+
+      case 'number':
+        return isFinite(value) ? String(value) : 'null';
+
+      case 'boolean':
+      case 'null':
+        return String(value);
+
+      case 'object':
+        if (!value) {
+          return 'null';
+        }
+
+        gap += indent;
+        partial = [];
+
+        if (Object.prototype.toString.apply(value) === '[object Array]') {
+          length = value.length;
+
+          for (i = 0; i < length; i += 1) {
+            partial[i] = str(i, value) || 'null';
+          }
+
+          v = partial.length === 0 ? '[]' : gap ? '[\n' + gap + partial.join(',\n' + gap) + '\n' + mind + ']' : '[' + partial.join(',') + ']';
+          gap = mind;
+          return v;
+        }
+
+        if (rep && typeof rep === 'object') {
+          length = rep.length;
+
+          for (i = 0; i < length; i += 1) {
+            if (typeof rep[i] === 'string') {
+              k = rep[i];
+              v = str(k, value);
+
+              if (v) {
+                partial.push(quote(k) + (gap ? ': ' : ':') + v);
+              }
+            }
+          }
+        } else {
+          for (k in value) {
+            if (Object.prototype.hasOwnProperty.call(value, k)) {
+              v = str(k, value);
+
+              if (v) {
+                partial.push(quote(k) + (gap ? ': ' : ':') + v);
+              }
+            }
+          }
+        }
+
+        v = partial.length === 0 ? '{}' : gap ? '{\n' + gap + partial.join(',\n' + gap) + '\n' + mind + '}' : '{' + partial.join(',') + '}';
+        gap = mind;
+        return v;
+    }
+  }
+
+  if (typeof JSON.stringify !== 'function') {
+    meta = {
+      '\b': '\\b',
+      '\t': '\\t',
+      '\n': '\\n',
+      '\f': '\\f',
+      '\r': '\\r',
+      '"': '\\"',
+      '\\': '\\\\'
+    };
+
+    JSON.stringify = function (value, replacer, space) {
+      var i;
+      gap = '';
+      indent = '';
+
+      if (typeof space === 'number') {
+        for (i = 0; i < space; i += 1) {
+          indent += ' ';
+        }
+      } else if (typeof space === 'string') {
+        indent = space;
+      }
+
+      rep = replacer;
+
+      if (replacer && typeof replacer !== 'function' && (typeof replacer !== 'object' || typeof replacer.length !== 'number')) {
+        throw new Error('JSON.stringify');
+      }
+
+      return str('', {
+        '': value
+      });
+    };
+  }
+
+  if (typeof JSON.parse !== 'function') {
+    JSON.parse = function (text, reviver) {
+      var j;
+
+      function walk(holder, key) {
+        var k,
+            v,
+            value = holder[key];
+
+        if (value && typeof value === 'object') {
+          for (k in value) {
+            if (Object.prototype.hasOwnProperty.call(value, k)) {
+              v = walk(value, k);
+
+              if (v !== undefined) {
+                value[k] = v;
+              } else {
+                delete value[k];
+              }
+            }
+          }
+        }
+
+        return reviver.call(holder, key, value);
+      }
+
+      text = String(text);
+      rx_dangerous.lastIndex = 0;
+
+      if (rx_dangerous.test(text)) {
+        text = text.replace(rx_dangerous, function (a) {
+          return "\\u" + ('0000' + a.charCodeAt(0).toString(16)).slice(-4);
+        });
+      }
+
+      if (rx_one.test(text.replace(rx_two, '@').replace(rx_three, ']').replace(rx_four, ''))) {
+        j = eval('(' + text + ')');
+        return typeof reviver === 'function' ? walk({
+          '': j
+        }, '') : j;
+      }
+
+      throw new SyntaxError('JSON.parse');
+    };
+  }
+}))();
+
 var DEFAULT = loadconfig(NAME, {
   fontsize: 9,
   fontfamily: 'Verdana',
@@ -485,7 +708,9 @@ var DEFAULT = loadconfig(NAME, {
   flatten: false,
   bind: 'right',
   autoSave: false,
-  enableAlert: true
+  whiteBorder: false,
+  enableAlert: true,
+  keepParameter: true
 });
 
 if (typeof DEFAULT.verticalMode === 'string') {
@@ -499,28 +724,42 @@ if (typeof DEFAULT.horizontalMode === 'string') {
 (function () {
   var docNum = documents.length;
   if (!docNum) return;
+
+  var settings = function () {
+    if (DEFAULT.keepParameter) {
+      var env = $.getenv('doujinhelper/autoFolio');
+      return env ? JSON.parse(env) : DEFAULT;
+    }
+
+    return DEFAULT;
+  }();
+
+  if ('skipPage' in settings === false) {
+    settings.skipPage = '';
+  }
+
   var dialog = new Window('dialog', '自動ノンブル');
   var innerWidth = 320;
   var fs = new FontSelector(dialog, {
     width: innerWidth
-  }, DEFAULT.fontfamily, DEFAULT.fontstyle);
+  }, settings.fontfamily, settings.fontstyle);
   var fontSetting = dialog.add("Group{\
 		fontsize:Group{\
 			label:StaticText{text:'フォントサイズ'},\
-			edit:EditText{text:'" + DEFAULT.fontsize + "',justify:'right',characters:4},\
+			edit:EditText{text:'" + settings.fontsize + "',justify:'right',characters:4},\
 			unit:StaticText{text:'pt'}\
 		},\
 		color:Group{\
 			label:StaticText{text:'カラー'}\
 		}\
 	}");
-  var defaultColor = activeDocument.mode === DocumentMode.RGB ? DEFAULT.colorRGB : DEFAULT.colorCMYK;
+  var defaultColor = activeDocument.mode === DocumentMode.RGB ? settings.colorRGB : settings.colorCMYK;
   var fontColor = new ColorPickerButton(fontSetting.color, undefined, defaultColor);
   var numGroup = dialog.add('group');
   numGroup.preferredSize.width = innerWidth;
   var inputNum = numGroup.add("Group{\
 		label:StaticText{text:'初期値',justify:'right'},\
-		edit:EditText{text:'" + DEFAULT.initNum + "'}\
+		edit:EditText{text:'" + settings.initNum + "'}\
 	}");
   inputNum.preferredSize.width = 220;
   inputNum.label.preferredSize.width = 48;
@@ -532,17 +771,17 @@ if (typeof DEFAULT.horizontalMode === 'string') {
   inputDigits.preferredSize.width = innerWidth - inputNum.preferredSize.width - numGroup.spacing;
   inputDigits.label.preferredSize.width = 24;
   inputDigits.list.preferredSize.width = inputDigits.preferredSize.width - inputDigits.label.preferredSize.width - inputDigits.spacing;
-  inputDigits.list.selection = DEFAULT.digits - 1;
+  inputDigits.list.selection = settings.digits - 1;
   var inputBleed = dialog.add("Group{\
 		label:StaticText{text:'断ち切り',justify:'right'},\
-		edit:EditText{text:'" + DEFAULT.bleed + "',justify:'right'}\
+		edit:EditText{text:'" + settings.bleed + "',justify:'right'}\
 		unit:StaticText{text:'mm',justify:'left'}\
 	}");
   inputBleed.preferredSize.width = innerWidth;
   inputBleed.label.preferredSize.width = 48;
   inputBleed.edit.preferredSize.width = 225;
-  var inputVertical = new FolioCoords(dialog, 'vertical', DEFAULT.verticalMode, DEFAULT.verticalSpace);
-  var inputHorizontal = new FolioCoords(dialog, 'horizontal', DEFAULT.horizontalMode, DEFAULT.horizontalSpace);
+  var inputVertical = new FolioCoords(dialog, 'vertical', settings.verticalMode, settings.verticalSpace);
+  var inputHorizontal = new FolioCoords(dialog, 'horizontal', settings.horizontalMode, settings.horizontalSpace);
   var inputSkipPage = dialog.add("Group{\
 		label:StaticText{text:'除外ページ',justify:'right'},\
 		edit:EditText{text:''}\
@@ -557,7 +796,7 @@ if (typeof DEFAULT.horizontalMode === 'string') {
 		bindL:RadioButton{text:'左綴じ'}\
 	}");
 
-  if (DEFAULT.bind.toLowerCase() === 'left') {
+  if (settings.bind.toLowerCase() === 'left') {
     flugGroup.bindL.value = true;
   } else {
     flugGroup.bindR.value = true;
@@ -580,12 +819,14 @@ if (typeof DEFAULT.horizontalMode === 'string') {
 		save:Checkbox{text:'保存して閉じる'}\
 	}");
   var inputSave = flugGroup2.save;
-  inputSave.value = DEFAULT.autoSave;
+  inputSave.value = settings.autoSave;
+  flugGroup.flatten.value = settings.flatten;
+  flugGroup2.white.value = settings.whiteBorder;
 
-  if (activeDocument.mode === DocumentMode.BITMAP) {
+  if ('binarization' in settings) {
+    flugGroup.binarization.value = settings.binarization;
+  } else if (activeDocument.mode === DocumentMode.BITMAP) {
     flugGroup.binarization.value = flugGroup.flatten.value = flugGroup2.white.value = true;
-  } else {
-    flugGroup.flatten.value = DEFAULT.flatten;
   }
 
   new ActionButtons(dialog);
@@ -595,7 +836,54 @@ if (typeof DEFAULT.horizontalMode === 'string') {
     return;
   }
 
-  var autoSave = inputSave.value;
+  var selectedFont = fs.getPostScriptName(),
+      fontsize = convertFloat(fontSetting.fontsize.edit.text, DEFAULT.fontsize),
+      color = fontColor.getColor();
+  var initNum = convertInt(inputNum.edit.text, 3),
+      bleed = convertFloat(inputBleed.edit.text, 0),
+      binarization = flugGroup.binarization.value,
+      flatten = flugGroup.flatten.value,
+      bindRight = flugGroup.bindR.value,
+      verticalMode = inputVertical.mode,
+      verticalSpace = inputVertical.getValue() + bleed,
+      horizontalMode = inputHorizontal.mode,
+      horizontalSpace = inputHorizontal.getValue() + bleed,
+      whiteBorder = flugGroup2.white.value,
+      digits = inputDigits.list.selection === null ? 1 : parseInt(inputDigits.list.selection.text, 10),
+      enableAlert = DEFAULT.enableAlert,
+      autoSave = inputSave.value;
+  var skipPage = inputSkipPage.edit.text.split(/,\s*|\s+/);
+
+  if (skipPage.length) {
+    skipPage.unique();
+  }
+
+  if (DEFAULT.keepParameter) {
+    var _ref, _inputVertical$getVal, _ref2, _inputHorizontal$getV;
+
+    $.setenv('doujinhelper/autoFolio', JSON.stringify({
+      fontfamily: fs.getFamily(),
+      fontstyle: fs.getStyle(),
+      fontsize: fontsize,
+      colorCMYK: fontColor.getCMYK(),
+      colorRGB: fontColor.getRGB(),
+      initNum: initNum,
+      digits: digits,
+      bleed: bleed,
+      verticalMode: verticalMode,
+      verticalSpace: (_ref = (_inputVertical$getVal = inputVertical.getValue()) != null ? _inputVertical$getVal : settings.verticalSpace) != null ? _ref : DEFAULT.verticalSpace,
+      horizontalMode: horizontalMode,
+      horizontalSpace: (_ref2 = (_inputHorizontal$getV = inputHorizontal.getValue()) != null ? _inputHorizontal$getV : settings.horizontalSpace) != null ? _ref2 : DEFAULT.horizontalSpace,
+      binarization: binarization,
+      flatten: flatten,
+      bind: bindRight ? 'right' : 'left',
+      whiteBorder: whiteBorder,
+      autoSave: autoSave,
+      skipPage: skipPage.join(',')
+    }));
+  }
+
+  skipPage.reverse();
   var fObj;
 
   if (autoSave) {
@@ -623,28 +911,7 @@ if (typeof DEFAULT.horizontalMode === 'string') {
     }
   }
 
-  var selectedFont = fs.getPostScriptName(),
-      fontsize = convertFloat(fontSetting.fontsize.edit.text, DEFAULT.fontsize),
-      color = fontColor.getColor();
-  var initNum = convertInt(inputNum.edit.text, 3),
-      bleed = convertFloat(inputBleed.edit.text, 0),
-      binarization = flugGroup.binarization.value,
-      flatten = flugGroup.flatten.value,
-      bindRight = flugGroup.bindR.value,
-      verticalMode = inputVertical.mode,
-      verticalSpace = inputVertical.getValue() + bleed,
-      horizontalMode = inputHorizontal.mode,
-      horizontalSpace = inputHorizontal.getValue() + bleed,
-      whiteBorder = flugGroup2.white.value,
-      digits = inputDigits.list.selection === null ? 1 : parseInt(inputDigits.list.selection.text, 10),
-      enableAlert = DEFAULT.enableAlert;
   var zeropad = Array(digits).join('0');
-  var skipPage = inputSkipPage.edit.text.split(/,\s*|\s+/);
-
-  if (skipPage.length) {
-    skipPage.unique().reverse();
-  }
-
   var unitCache = {
     ruler: preferences.rulerUnits,
     type: preferences.typeUnits
