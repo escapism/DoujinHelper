@@ -54,7 +54,7 @@ const DEFAULT = loadconfig(NAME, {
   }
 
   const bleed = convertFloat(inputBleed.edit.text, 0, true),
-    spine = inputSpine.edit.text === '' ? -1 : convertFloat(inputSpine.edit.text, 0),
+    spine = inputSpine.edit.text !== '' ? convertFloat(inputSpine.edit.text, 0) : '',
     addBleed = inputAddBleed.value
 
   // 設定値を環境変数にJSONで保存
@@ -92,7 +92,7 @@ const DEFAULT = loadconfig(NAME, {
   }
 
   // 背幅ガイド
-  if (spine > -1) {
+  if (spine !== '') {
     const spineLeft = (width - spine) / 2
     activeDocument.guides.add(Direction.VERTICAL, spineLeft)
     if (spine > 0) {

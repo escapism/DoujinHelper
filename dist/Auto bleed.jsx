@@ -390,7 +390,7 @@ var DEFAULT = loadconfig(NAME, {
   }
 
   var bleed = convertFloat(inputBleed.edit.text, 0, true),
-      spine = inputSpine.edit.text === '' ? -1 : convertFloat(inputSpine.edit.text, 0),
+      spine = inputSpine.edit.text !== '' ? convertFloat(inputSpine.edit.text, 0) : '',
       addBleed = inputAddBleed.value;
 
   if (DEFAULT.keepParameter) {
@@ -418,7 +418,7 @@ var DEFAULT = loadconfig(NAME, {
     activeDocument.guides.add(Direction.HORIZONTAL, height - bleed);
   }
 
-  if (spine > -1) {
+  if (spine !== '') {
     var spineLeft = (width - spine) / 2;
     activeDocument.guides.add(Direction.VERTICAL, spineLeft);
 
