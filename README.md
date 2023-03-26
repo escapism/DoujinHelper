@@ -165,14 +165,16 @@ See 'DOUJINHELPER.conf'. It is vanilla JavaScript file.
 各スクリプトの初期値は DOUJINHELPER.conf で設定できます。中身はJavaScriptの文法に従います。  
 このファイル自体は無くても動きます。  
 
+バージョン1.1以降、ダイアログで変更した値はアプリケーションを終了するまで保持されます。この機能をオフにするには、 DOUJINHELPER.conf で各スクリプトの 'keepParameter' を 'false' にしてください。
+
 ## Requirements
 
 I have checked on environment below.
 
 以下の環境で動作確認済みです。
 
-- Photoshop 2022 / macOS Big Sur
-- Photoshop 2022 / Windows 10
+- Photoshop 2023 / macOS Ventura
+- Photoshop 2023 / Windows 10
 
 ## License
 
